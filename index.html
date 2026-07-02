@@ -304,7 +304,7 @@ let score=0, wave=1, lives=3, frame=0;
 
 const player={x:0,y:0,w:0,h:0,speed:0,cooldown:0};
 
-let bullets=[], enemyBullets=[], enemies=[], particles=[], stars=[];
+let bullets=[], enemyBullets=[], enemies=[], particles=[], rings=[], stars=[];
 
 function initStars(){
   stars=[];
@@ -338,7 +338,7 @@ function spawnWave(n){
 }
 
 function resetGame(){
-  score=0; wave=1; lives=3; bullets=[]; enemyBullets=[]; particles=[];
+  score=0; wave=1; lives=3; bullets=[]; enemyBullets=[]; particles=[]; rings=[];
   initStars(); initPlayer(); spawnWave(wave); updateHud();
 }
 
@@ -355,6 +355,10 @@ function addParticles(x,y,color,count=10){
     particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,
       life:25+Math.random()*15, color});
   }
+}
+
+function addRing(x,y,color,big=false){
+  rings.push({x,y,r:0,maxR:big?W()*0.12:W()*0.07,color,life:18,maxLife:18,big});
 }
 
 function rectsOverlap(a,b){
@@ -436,7 +440,7 @@ function update(){
     en.y+=h*0.0002;
     if(Math.random()<en.fireChance)
       enemyBullets.push({x:en.x, y:en.y+eh, vy:h*0.009});
-    if(en.y>h-h*0.08){ en.alive=false; hitPlayer(); addParticles(en.x,en.y,'#ff3df0',14); }
+    if(en.y>h-h*0.08){ en.alive=false; hitPlayer(); addParticles(en.x,en.y,'#ff3df0',14); addRing(en.x,en.y,'#ff3df0'); }
   });
 
   // collisions: bullets -> enemies
@@ -448,7 +452,7 @@ function update(){
       if(rectsOverlap(bb,eb)){
         en.hp--;
         b.vy=0; b.y=-999;
-        if(en.hp<=0){ en.alive=false; score+=100; addParticles(en.x,en.y,'#5ef2ff',14); playExplosion(); }
+        if(en.hp<=0){ en.alive=false; score+=100; addParticles(en.x,en.y,'#5ef2ff',14); addRing(en.x,en.y,'#5ef2ff'); playExplosion(); }
       }
     });
   });
@@ -465,13 +469,17 @@ function update(){
   particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.life--; });
   particles=particles.filter(p=>p.life>0);
 
+  // rings
+  rings.forEach(r=>{ r.r += r.maxR/r.maxLife * 2.2; r.life--; });
+  rings=rings.filter(r=>r.life>0);
+
   if(aliveCount===0){ wave++; spawnWave(wave); playWaveClear(); }
   updateHud();
 }
 
 function hitPlayer(){
   lives--;
-  addParticles(player.x,player.y,'#ffd23f',18);
+  addParticles(player.x,player.y,'#ffd23f',18); addRing(player.x,player.y,'#ffd23f',true);
   playHit();
   updateHud();
   if(lives<=0) endGame();
@@ -553,7 +561,29 @@ function draw(){
     ctx.fillRect(p.x,p.y,ps,ps);
   });
   ctx.globalAlpha=1;
+
+  // explosion rings
+  rings.forEach(r=>{
+    const alpha = (r.life/r.maxLife)*0.85;
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = r.color;
+    ctx.shadowColor = r.color;
+    ctx.shadowBlur = r.big ? 20 : 12;
+    ctx.lineWidth = r.big ? w*0.006 : w*0.004;
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+    ctx.stroke();
+    if(r.r > w*0.02){
+      ctx.globalAlpha = alpha*0.4;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r*0.6, 0, Math.PI*2);
+      ctx.stroke();
+    }
+    ctx.shadowBlur=0;
+  });
+  ctx.globalAlpha=1;
 }
+
 
 function loop(){ update(); draw(); requestAnimationFrame(loop); }
 initStars();
